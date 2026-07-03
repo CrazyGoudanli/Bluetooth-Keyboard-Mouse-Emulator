@@ -56,9 +56,10 @@ MouseDelta readImuMouseDelta()
     }
 
     // Air-mouse style mapping for Cardputer-Adv held in normal landscape orientation:
-    // yaw around Z controls left/right, pitch around X controls up/down.
+    // roll/left-right tilt around Y controls horizontal movement;
+    // pitch/up-down tilt around X controls vertical movement.
     // Invert Y so tilting/rotating the top away generally moves the cursor up.
-    float rawX = applyDeadzone(gz) * GYRO_SENSITIVITY;
+    float rawX = applyDeadzone(gy) * GYRO_SENSITIVITY;
     float rawY = -applyDeadzone(gx) * GYRO_SENSITIVITY;
 
     filteredX = (FILTER_ALPHA * rawX) + ((1.0f - FILTER_ALPHA) * filteredX);
