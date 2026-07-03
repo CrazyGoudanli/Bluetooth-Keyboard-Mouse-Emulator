@@ -3,23 +3,24 @@
 #include <math.h>
 
 namespace {
-// Gyro units returned by M5Unified are degrees/second for BMI270.
-// Tune these if the real device feels too slow/fast or if an axis is inverted.
-constexpr float GYRO_DEADZONE_DPS = 6.0f;
-constexpr float GYRO_SENSITIVITY = 0.16f;
-constexpr float FILTER_ALPHA = 0.35f;
-constexpr int MAX_DELTA = 20;
+// Accelerometer values are in g. Treat tilt as a 2D joystick vector:
+// hold a tilt to keep moving in that direction, return to level to stop.
+// Tune these if the real device feels too slow/fast, drifts, or an axis is inverted.
+constexpr float TILT_DEADZONE_G = 0.10f;
+constexpr float TILT_FULL_SCALE_G = 0.75f;
+constexpr float SPEED_CURVE = 1.7f;
+constexpr float FILTER_ALPHA = 0.28f;
+constexpr int MAX_DELTA = 28;
 
 float filteredX = 0.0f;
 float filteredY = 0.0f;
 bool imuReady = false;
 
-float applyDeadzone(float value)
+float clampFloat(float value, float minValue, float maxValue)
 {
-    if (fabsf(value) < GYRO_DEADZONE_DPS) {
-        return 0.0f;
-    }
-    return value > 0 ? value - GYRO_DEADZONE_DPS : value + GYRO_DEADZONE_DPS;
+    if (value < minValue) return minValue;
+    if (value > maxValue) return maxValue;
+    return value;
 }
 
 int8_t clampToMouseDelta(float value)
@@ -48,19 +49,35 @@ MouseDelta readImuMouseDelta()
         }
     }
 
-    float gx = 0.0f;
-    float gy = 0.0f;
-    float gz = 0.0f;
-    if (!M5.Imu.getGyro(&gx, &gy, &gz)) {
+    float ax = 0.0f;
+    float ay = 0.0f;
+    float az = 0.0f;
+    if (!M5.Imu.getAccel(&ax, &ay, &az)) {
         return delta;
     }
 
-    // Air-mouse style mapping for Cardputer-Adv held in normal landscape orientation:
-    // roll/left-right tilt around Y controls horizontal movement;
-    // pitch/up-down tilt around X controls vertical movement.
-    // Invert Y so tilting/rotating the top away generally moves the cursor up.
-    float rawX = applyDeadzone(gy) * GYRO_SENSITIVITY;
-    float rawY = -applyDeadzone(gx) * GYRO_SENSITIVITY;
+    // Cardputer-Adv held in normal landscape orientation.
+    // Use ax for horizontal and ay for vertical; X is inverted to match the real device feel.
+    // Change the signs here if the real device direction feels inverted.
+    float stickX = -ax;
+    float stickY = -ay;
+
+    // Circular deadzone keeps diagonal/all-direction movement natural.
+    float magnitude = sqrtf((stickX * stickX) + (stickY * stickY));
+    float rawX = 0.0f;
+    float rawY = 0.0f;
+
+    if (magnitude > TILT_DEADZONE_G) {
+        float usable = (magnitude - TILT_DEADZONE_G) / (TILT_FULL_SCALE_G - TILT_DEADZONE_G);
+        usable = clampFloat(usable, 0.0f, 1.0f);
+
+        float speed = powf(usable, SPEED_CURVE) * MAX_DELTA;
+        float directionX = stickX / magnitude;
+        float directionY = stickY / magnitude;
+
+        rawX = directionX * speed;
+        rawY = directionY * speed;
+    }
 
     filteredX = (FILTER_ALPHA * rawX) + ((1.0f - FILTER_ALPHA) * filteredX);
     filteredY = (FILTER_ALPHA * rawY) + ((1.0f - FILTER_ALPHA) * filteredY);
