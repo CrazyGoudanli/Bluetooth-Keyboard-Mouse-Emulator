@@ -2,6 +2,7 @@
 #include "bluetooth.h"
 #include "display.h"
 #include "usbHid.h"
+#include "imuMouse.h"
 #include <USB.h>
 
 bool mouseMode = true;
@@ -42,6 +43,7 @@ void setup() {
     M5Cardputer.begin(cfg, true);
     
     setupDisplay();
+    setupImuMouse();
     displayWelcomeScreen();
 
     selectMode();
