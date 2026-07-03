@@ -66,11 +66,12 @@ void loop() {
         lastBluetoothStatus = bluetoothStatus;
     }
 
-    // Switch between keyboard/mouse
-    if (M5Cardputer.BtnA.isPressed()) {
+    // Switch between keyboard/mouse once per G0 press.
+    // Using edge detection avoids repeated toggles while the button is held,
+    // which can look like the switch did nothing.
+    if (M5Cardputer.BtnA.wasPressed()) {
         mouseMode = !mouseMode;
         drawDeviceRect(mouseMode);
-        delay(200);
     }
 
     if (usbMode) {
